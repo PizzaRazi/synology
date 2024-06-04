@@ -1,0 +1,56 @@
+version: "3.9"
+services:
+  db:
+    image: mongo:4.4 # only up to 4.4 !
+    container_name: Unifi-Network-Application-Database
+    hostname: unifi-db
+    mem_limit: 2g
+    cpu_shares: 768
+    security_opt:
+      - no-new-privileges:false
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    volumes:
+      - /volume1/docker/unifi/db:/data/db:rw
+      - /volume1/docker/unifi/db/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    restart: on-failure:5
+
+  unifi-network-application:
+    image: ghcr.io/linuxserver/unifi-network-application:latest
+    container_name: Unifi-Network-Application
+    hostname: unifi-network-application
+    mem_limit: 4g
+    cpu_shares: 1024
+    security_opt:
+      - no-new-privileges:false
+    ports:
+      - 8443:8443       # Required - web admin port
+      - 3478:3478/udp   # Required - STUN port
+      - 10001:10001/udp # Required - AP discovery
+      - 8080:8080       # Required - Device communication
+      #- 1900:1900/udp   # optional - controller discoverable on L2 network
+      - 8843:8843       # optional - Unifi guest portal HTTPS redirect port
+      - 8880:8880       # optional - Unifi guest portal HTTP redirect port
+      - 6789:6789       # optional - For mobile throughput test
+      - 5514:5514/udp   # optional - Remote syslog port
+    volumes:
+      - /volume1/docker/unifi/config:/config:rw
+    environment:
+      TZ: America/Los_Angeles
+      PUID: 1026
+      PGID: 100
+      MONGO_USER: unifiuser
+      MONGO_PASS: unifipass
+      MONGO_HOST: unifi-db
+      MONGO_PORT: 27017
+      MONGO_DBNAME: unifi
+      MEM_LIMIT: 2048   # optional - Java memory limit
+      MEM_STARTUP: 2048 # optional - Java initial/minimum memory
+    restart: on-failure:5
+    depends_on:
+      db:
+        condition: service_started
